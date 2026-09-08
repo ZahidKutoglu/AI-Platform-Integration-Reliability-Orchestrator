@@ -1,0 +1,61 @@
+{
+  "name": "Configuration Drift",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ops-config-drift"
+      },
+      "id": "webhook",
+      "name": "Drift webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/events",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"type\":\"configuration.drift_detected\",\"title\":\"{{ $json.title }}\",\"platformSlug\":\"{{ $json.platform }}\"}"
+      },
+      "id": "change",
+      "name": "Create change request path",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "channel": "#ai-operations",
+        "text": "=Configuration drift on {{ $json.platform }}. Waiting for approval before remediation."
+      },
+      "id": "notify",
+      "name": "Notify admin",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [760, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:3000/api/configuration/{{ $json.platform }}"
+      },
+      "id": "wait-approval",
+      "name": "Load drift record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 300]
+    }
+  ],
+  "connections": {
+    "Drift webhook": { "main": [[{ "node": "Create change request path", "type": "main", "index": 0 }]] },
+    "Create change request path": { "main": [[{ "node": "Notify admin", "type": "main", "index": 0 }]] },
+    "Notify admin": { "main": [[{ "node": "Load drift record", "type": "main", "index": 0 }]] }
+  },
+  "meta": {
+    "ops": {
+      "purpose": "Drift detected → webhook → change request → notify admin → remediate after approval."
+    }
+  }
+}

@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lumen-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lumen
+      POSTGRES_PASSWORD: lumen
+      POSTGRES_DB: lumen
+    ports:
+      - "5432:5432"
+    volumes:
+      - lumen_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lumen -d lumen"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  n8n:
+    image: n8nio/n8n:1.82.3
+    container_name: lumen-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      WEBHOOK_URL: http://localhost:5678/
+      N8N_SECURE_COOKIE: "false"
+      GENERIC_TIMEZONE: America/New_York
+    volumes:
+      - lumen_n8n:/home/node/.n8n
+    profiles: ["full"]
+
+  app:
+    build: .
+    container_name: lumen-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://lumen:lumen@postgres:5432/lumen?schema=public
+      NEXT_PUBLIC_APP_NAME: AI Operations
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      DEMO_MODE: "true"
+      DEMO_OPERATOR_EMAIL: maya.chen@example.com
+      DEMO_OPERATOR_ROLE: admin
+      WEBHOOK_SECRET: local-demo-webhook-secret
+      N8N_BASE_URL: http://n8n:5678
+      API_RATE_LIMIT_PER_MINUTE: "120"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: ["full"]
+
+volumes:
+  lumen_pg:
+  lumen_n8n:

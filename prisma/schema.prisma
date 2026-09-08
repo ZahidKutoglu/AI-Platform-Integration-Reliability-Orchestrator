@@ -1,0 +1,455 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  OPERATOR
+  VIEWER
+}
+
+enum OperationalStatus {
+  OPERATIONAL
+  DEGRADED
+  OUTAGE
+  MAINTENANCE
+}
+
+enum ConnectionStatus {
+  CONNECTED
+  DEGRADED
+  DISCONNECTED
+}
+
+enum Severity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IncidentStatus {
+  DETECTED
+  INVESTIGATING
+  MITIGATING
+  MONITORING
+  RESOLVED
+}
+
+enum IncidentSeverity {
+  P1
+  P2
+  P3
+  P4
+}
+
+enum ProcessingStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+enum ChangeStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  EXECUTING
+  VERIFIED
+  FAILED
+}
+
+enum DriftStatus {
+  OPEN
+  REVIEWING
+  APPROVED
+  REMEDIATED
+}
+
+enum AutomationStatus {
+  ACTIVE
+  PAUSED
+}
+
+enum ExecutionStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+  RETRIED
+  CANCELLED
+}
+
+enum IntegrationKind {
+  AI_PLATFORM
+  IDENTITY
+  TICKETING
+  NOTIFICATIONS
+  AUTOMATION
+}
+
+enum VendorEscalationStatus {
+  DRAFT
+  SENT
+  ACKNOWLEDGED
+  CLOSED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  role         UserRole @default(OPERATOR)
+  department   String
+  title        String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  ownedIncidents     Incident[]      @relation("IncidentOwner")
+  requestedChanges   ChangeRequest[] @relation("ChangeRequester")
+  notifications      Notification[]
+  auditEvents        AuditEvent[]
+}
+
+model Platform {
+  id                   String             @id @default(cuid())
+  slug                 String             @unique
+  name                 String
+  vendor               String
+  description          String
+  connectorKey         String
+  status               OperationalStatus  @default(OPERATIONAL)
+  connectionStatus     ConnectionStatus   @default(CONNECTED)
+  apiHealth            OperationalStatus  @default(OPERATIONAL)
+  latencyMs            Int
+  errorRate            Float
+  uptimePercent        Float
+  lastSyncAt           DateTime
+  workflowCount        Int                @default(0)
+  userCount            Int                @default(0)
+  configurationStatus  String
+  sloAvailability      Float
+  sloLatencyMs         Int
+  sloErrorRate         Float
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  healthSnapshots      PlatformHealth[]
+  events               PlatformEvent[]
+  incidents            Incident[]
+  workflows            Workflow[]
+  integrations         Integration[]
+  baselines            ConfigurationBaseline[]
+  snapshots            ConfigurationSnapshot[]
+  drifts               ConfigurationDrift[]
+  changeRequests       ChangeRequest[]
+  runbooks             Runbook[]
+  escalations          VendorEscalation[]
+  automations          Automation[]
+}
+
+model Integration {
+  id              String             @id @default(cuid())
+  slug            String             @unique
+  name            String
+  kind            IntegrationKind
+  platformId      String?
+  status          ConnectionStatus   @default(CONNECTED)
+  health          OperationalStatus  @default(OPERATIONAL)
+  lastSyncAt      DateTime
+  eventsReceived  Int                @default(0)
+  apiLatencyMs    Int
+  configJson      Json
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  platform        Platform?          @relation(fields: [platformId], references: [id])
+  logs            IntegrationLog[]
+}
+
+model IntegrationLog {
+  id             String      @id @default(cuid())
+  integrationId  String
+  timestamp      DateTime    @default(now())
+  level          String
+  message        String
+  details        Json?
+
+  integration    Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+}
+
+model PlatformHealth {
+  id                    String   @id @default(cuid())
+  platformId            String
+  timestamp             DateTime @default(now())
+  availability          Float
+  latencyMs             Int
+  errorRate             Float
+  workflowSuccessRate   Float
+
+  platform              Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@index([platformId, timestamp])
+}
+
+model PlatformEvent {
+  id                String           @id @default(cuid())
+  timestamp         DateTime         @default(now())
+  platformId        String?
+  type              String
+  severity          Severity
+  title             String
+  payload           Json
+  correlationId     String
+  processingStatus  ProcessingStatus @default(PENDING)
+  source            String
+  createdAt         DateTime         @default(now())
+
+  platform          Platform?        @relation(fields: [platformId], references: [id])
+  incidentEvents    IncidentEvent[]
+
+  @@index([timestamp])
+  @@index([type])
+  @@index([correlationId])
+}
+
+model Incident {
+  id                 String           @id @default(cuid())
+  number             String           @unique
+  title              String
+  severity           IncidentSeverity
+  status             IncidentStatus   @default(DETECTED)
+  platformId         String
+  affectedWorkflows  Json
+  affectedUsers      Int
+  detectedAt         DateTime         @default(now())
+  resolvedAt         DateTime?
+  ownerId            String?
+  rootCause          String?
+  remediation        String?
+  vendorStatus       String
+  summary            String
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  platform           Platform         @relation(fields: [platformId], references: [id])
+  owner              User?            @relation("IncidentOwner", fields: [ownerId], references: [id])
+  timeline           IncidentEvent[]
+  notifications      Notification[]
+  escalations        VendorEscalation[]
+}
+
+model IncidentEvent {
+  id               String         @id @default(cuid())
+  incidentId       String
+  timestamp        DateTime       @default(now())
+  type             String
+  message          String
+  actor            String
+  platformEventId  String?
+
+  incident         Incident       @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  platformEvent    PlatformEvent? @relation(fields: [platformEventId], references: [id])
+}
+
+model Workflow {
+  id              String     @id @default(cuid())
+  slug            String     @unique
+  name            String
+  platformId      String
+  kind            String
+  status          String
+  description     String
+  n8nWorkflowId   String?
+  trigger         String
+  fallbackSlug    String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  platform        Platform   @relation(fields: [platformId], references: [id])
+  executions      WorkflowExecution[]
+}
+
+model WorkflowExecution {
+  id           String           @id @default(cuid())
+  workflowId   String
+  startedAt    DateTime         @default(now())
+  completedAt  DateTime?
+  status       ExecutionStatus
+  durationMs   Int?
+  error        String?
+  attempt      Int              @default(1)
+
+  workflow     Workflow         @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId, startedAt])
+}
+
+model ConfigurationBaseline {
+  id             String   @id @default(cuid())
+  platformId     String
+  key            String
+  label          String
+  expectedValue  String
+  category       String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  platform       Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@unique([platformId, key])
+}
+
+model ConfigurationSnapshot {
+  id          String   @id @default(cuid())
+  platformId  String
+  observedAt  DateTime @default(now())
+  values      Json
+  source      String
+
+  platform    Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+}
+
+model ConfigurationDrift {
+  id             String      @id @default(cuid())
+  platformId     String
+  key            String
+  label          String
+  expectedValue  String
+  observedValue  String
+  severity       Severity
+  status         DriftStatus @default(OPEN)
+  detectedAt     DateTime    @default(now())
+  resolvedAt     DateTime?
+
+  platform       Platform    @relation(fields: [platformId], references: [id], onDelete: Cascade)
+}
+
+model ChangeRequest {
+  id              String       @id @default(cuid())
+  number          String       @unique
+  title           String
+  status          ChangeStatus @default(PENDING_APPROVAL)
+  requestedById   String
+  platformId      String
+  risk            String
+  proposedChange  String
+  executedAt      DateTime?
+  verifiedAt      DateTime?
+  result          String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  requestedBy     User         @relation("ChangeRequester", fields: [requestedById], references: [id])
+  platform        Platform     @relation(fields: [platformId], references: [id])
+}
+
+model Runbook {
+  id                      String    @id @default(cuid())
+  slug                    String    @unique
+  title                   String
+  platformId              String?
+  summary                 String
+  symptoms                Json
+  detection               String
+  initialChecks           Json
+  diagnosticSteps         Json
+  automatedRemediation    Json
+  manualRemediation       Json
+  escalationCriteria      Json
+  recoveryVerification    Json
+  postIncidentSteps       Json
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  platform                Platform? @relation(fields: [platformId], references: [id])
+}
+
+model Automation {
+  id               String            @id @default(cuid())
+  slug             String            @unique
+  name             String
+  trigger          String
+  action           String
+  status           AutomationStatus  @default(ACTIVE)
+  lastExecutionAt  DateTime?
+  successRate      Float
+  avgExecutionMs   Int
+  description      String
+  platformId       String?
+  n8nWorkflowFile  String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  platform         Platform?         @relation(fields: [platformId], references: [id])
+  executions       AutomationExecution[]
+}
+
+model AutomationExecution {
+  id            String           @id @default(cuid())
+  automationId  String
+  startedAt     DateTime         @default(now())
+  completedAt   DateTime?
+  status        ExecutionStatus
+  durationMs    Int?
+  result        Json?
+
+  automation    Automation       @relation(fields: [automationId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id          String    @id @default(cuid())
+  userId      String?
+  title       String
+  message     String
+  kind        String
+  read        Boolean   @default(false)
+  muted       Boolean   @default(false)
+  incidentId  String?
+  href        String?
+  createdAt   DateTime  @default(now())
+
+  user        User?     @relation(fields: [userId], references: [id])
+  incident    Incident? @relation(fields: [incidentId], references: [id])
+}
+
+model VendorEscalation {
+  id          String                  @id @default(cuid())
+  number      String                  @unique
+  incidentId  String
+  platformId  String
+  package     Json
+  status      VendorEscalationStatus  @default(DRAFT)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  incident    Incident                @relation(fields: [incidentId], references: [id])
+  platform    Platform                @relation(fields: [platformId], references: [id])
+}
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  timestamp  DateTime @default(now())
+  actorId    String?
+  actor      String
+  action     String
+  resource   String
+  details    Json
+  createdAt  DateTime @default(now())
+
+  user       User?    @relation(fields: [actorId], references: [id])
+
+  @@index([timestamp])
+}
+
+model SimulationState {
+  id          String   @id @default("demo")
+  lastResetAt DateTime @default(now())
+  activeScenarios Json
+  updatedAt   DateTime @updatedAt
+}

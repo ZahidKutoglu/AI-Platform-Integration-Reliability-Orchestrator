@@ -1,0 +1,81 @@
+{
+  "name": "Failed Workflow Recovery",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ops-workflow-failed",
+        "responseMode": "responseNode"
+      },
+      "id": "webhook",
+      "name": "Operations event",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/workflows/{{ $json.workflow }}/execute"
+      },
+      "id": "retry",
+      "name": "Retry workflow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:3000/api/platforms/n8n/health"
+      },
+      "id": "verify",
+      "name": "Verify health",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.health.status }}",
+              "rightValue": "OPERATIONAL",
+              "operator": { "type": "string", "operation": "notEquals" }
+            }
+          ]
+        }
+      },
+      "id": "still-failing",
+      "name": "Still failing?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [980, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/events",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"type\":\"workflow.failed\",\"title\":\"Recovery retry still failing\",\"platformSlug\":\"n8n\"}"
+      },
+      "id": "incident",
+      "name": "Open incident",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1220, 220]
+    }
+  ],
+  "connections": {
+    "Operations event": { "main": [[{ "node": "Retry workflow", "type": "main", "index": 0 }]] },
+    "Retry workflow": { "main": [[{ "node": "Verify health", "type": "main", "index": 0 }]] },
+    "Verify health": { "main": [[{ "node": "Still failing?", "type": "main", "index": 0 }]] },
+    "Still failing?": { "main": [[{ "node": "Open incident", "type": "main", "index": 0 }]] }
+  },
+  "meta": {
+    "ops": {
+      "purpose": "n8n execution fails → event sent to the operations API → retry → verify → incident if still failing."
+    }
+  }
+}
