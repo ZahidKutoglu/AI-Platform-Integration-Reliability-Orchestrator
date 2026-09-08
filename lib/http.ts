@@ -50,6 +50,14 @@ export async function handleRoute<T>(
       path: new URL(request.url).pathname,
       message: error instanceof Error ? error.message : "unknown",
     });
-    return json({ error: "Something went wrong. The operations team has been notified." }, { status: 500 });
+    const detail = error instanceof Error ? error.message : "unknown";
+    return json(
+      {
+        error: isDemoMode()
+          ? detail
+          : "Something went wrong. The operations team has been notified.",
+      },
+      { status: 500 },
+    );
   }
 }

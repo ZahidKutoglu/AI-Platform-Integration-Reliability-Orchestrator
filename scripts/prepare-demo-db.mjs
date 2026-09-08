@@ -1,3 +1,4 @@
+import { copyFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,3 +22,5 @@ function run(bin, args) {
 run("prisma", ["generate"]);
 run("prisma", ["db", "push", "--skip-generate"]);
 run("tsx", ["prisma/seed.ts"]);
+
+copyFileSync(join(root, "prisma", "dev.db"), join(root, "lib", "demo.db"));

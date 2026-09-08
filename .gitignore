@@ -20,6 +20,7 @@ CLAUDE.md
 prisma/*.db
 prisma/*.db-journal
 prisma/dev.db
+lib/demo.db
 
 # test / coverage
 coverage
