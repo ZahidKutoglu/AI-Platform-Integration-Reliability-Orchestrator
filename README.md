@@ -112,6 +112,12 @@ npm run dev
 
 The default `DATABASE_URL` is a local SQLite file (`prisma/dev.db`) so the app runs without Docker. Open [http://localhost:3000](http://localhost:3000).
 
+## Deploy to Vercel
+
+Import the GitHub repo and deploy. Do not add environment variables or a hosted database. The build seeds a SQLite demo database and bundles it with the app.
+
+The ESLint deprecation, `package.json#prisma` notice, and Prisma “update available” banner during install are warnings, not failures.
+
 PostgreSQL + n8n (optional):
 
 ```bash

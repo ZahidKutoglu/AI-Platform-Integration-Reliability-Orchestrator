@@ -5,7 +5,7 @@
   "description": "AI Platform Operations & Reliability Orchestrator",
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build",
+    "build": "node scripts/prepare-demo-db.mjs && next build",
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
@@ -17,7 +17,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma db push --force-reset && tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "postinstall": "node scripts/prisma-generate.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -41,11 +41,13 @@
     "framer-motion": "^13.2.0",
     "lucide-react": "^1.42.0",
     "next": "^16.3.4",
+    "prisma": "^6.19.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "recharts": "^3.10.1",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.6.0",
+    "tsx": "^4.23.13",
     "zod": "^4.5.4"
   },
   "devDependencies": {
@@ -60,9 +62,7 @@
     "jsdom": "^30.0.1",
     "postcss": "^8.5.28",
     "prettier": "^3.9.6",
-    "prisma": "^6.19.3",
     "tailwindcss": "^4.3.3",
-    "tsx": "^4.23.13",
     "typescript": "^5.9.3",
     "vitest": "^4.1.11"
   }
