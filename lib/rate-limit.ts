@@ -1,6 +1,15 @@
 const buckets = new Map<string, { count: number; resetAt: number }>();
 
-export function rateLimit(key: string, limit = Number(process.env.API_RATE_LIMIT_PER_MINUTE ?? 120)) {
+function limitPerMinute() {
+  const parsed = Number(process.env.API_RATE_LIMIT_PER_MINUTE);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 120;
+}
+
+export function isDemoMode() {
+  return process.env.DEMO_MODE !== "false";
+}
+
+export function rateLimit(key: string, limit = limitPerMinute()) {
   const now = Date.now();
   const windowMs = 60_000;
   const current = buckets.get(key);

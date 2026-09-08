@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { logger } from "@/lib/logger";
-import { clientKey, rateLimit } from "@/lib/rate-limit";
+import { clientKey, isDemoMode, rateLimit } from "@/lib/rate-limit";
 
 export class ApiError extends Error {
   status: number;
@@ -21,7 +21,7 @@ export async function handleRoute<T>(
   options?: { skipRateLimit?: boolean },
 ) {
   try {
-    if (!options?.skipRateLimit) {
+    if (!options?.skipRateLimit && !isDemoMode()) {
       const limited = rateLimit(clientKey(request));
       if (!limited.ok) {
         return json(
